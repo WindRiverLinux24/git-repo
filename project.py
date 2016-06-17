@@ -562,6 +562,7 @@ class Project(object):
         relpath,
         revisionExpr,
         revisionId,
+        bare=False,
         rebase=True,
         groups=None,
         sync_c=False,
@@ -590,6 +591,7 @@ class Project(object):
             revisionExpr: The `revision` attribute of manifest.xml's project
                 element.
             revisionId: git commit id for checking out.
+            bare: Don't check out a revision, just make a bare clone.
             rebase: The `rebase` attribute of manifest.xml's project element.
             groups: The `groups` attribute of manifest.xml's project element.
             sync_c: The `sync-c` attribute of manifest.xml's project element.
@@ -613,6 +615,7 @@ class Project(object):
         self.client = self.manifest = manifest
         self.name = name
         self.remote = remote
+        self.bare = bare
         self.UpdatePaths(relpath, worktree, gitdir, objdir)
         self.SetRevision(revisionExpr, revisionId=revisionId)
 
@@ -658,11 +661,19 @@ class Project(object):
 
     def SetRevision(self, revisionExpr, revisionId=None):
         """Set revisionId based on revision expression and id"""
-        self.revisionExpr = revisionExpr
-        if revisionId is None and revisionExpr and IsId(revisionExpr):
-            self.revisionId = self.revisionExpr
+        if not self.bare:
+            self.revisionExpr = revisionExpr
+            if revisionId is None and revisionExpr and IsId(revisionExpr):
+                self.revisionId = self.revisionExpr
+            else:
+                self.revisionId = revisionId
         else:
-            self.revisionId = revisionId
+            if revisionId or revisionExpr:
+                raise ManifestInvalidRevisionError('revision specified for bare project %s' %
+                                                   (self.name))
+            else:
+                self.revisionId = None
+                self.revisionExpr = None
 
     def UpdatePaths(self, relpath, worktree, gitdir, objdir):
         """Update paths used by this project"""
@@ -680,7 +691,7 @@ class Project(object):
 
         if self.worktree:
             self.work_git = self._GitGetByExec(
-                self, bare=False, gitdir=self.gitdir
+                self, bare=self.bare, gitdir=self.gitdir
             )
         else:
             self.work_git = None
@@ -1352,7 +1363,7 @@ class Project(object):
 
         # See if we can skip the network fetch entirely.
         remote_fetched = False
-        if not (
+        if self.bare or not (
             optimized_fetch
             and (
                 ID_RE.match(self.revisionExpr)
@@ -1457,6 +1468,9 @@ class Project(object):
         if self.revisionId:
             return self.revisionId
 
+        if self.bare:
+            return None
+
         rem = self.GetRemote()
         rev = rem.ToLocal(self.revisionExpr)
 
@@ -1526,7 +1540,8 @@ class Project(object):
                 return
 
         def _doff():
-            self._FastForward(revid)
+            if not self.bare:
+                self._FastForward(revid)
             self._CopyAndLinkFiles()
 
         def _dosubmodules():
@@ -1549,7 +1564,7 @@ class Project(object):
                 fail(_PriorSyncFailedError(project=self.name))
                 return
 
-            if head == revid:
+            if head == revid or self.bare:
                 # No changes; don't do anything further.
                 # Except if the head needs to be detached.
                 if not syncbuf.detach_head:
@@ -2383,14 +2398,15 @@ class Project(object):
         # it will result in a shallow repository that cannot be cloned or
         # fetched from.
         # The repo project should also never be synced with partial depth.
-        if self.manifest.IsMirror or self.relpath == ".repo/repo":
+        if self.manifest.IsMirror or self.bare or self.relpath == ".repo/repo":
             depth = None
 
         if depth:
             current_branch_only = True
 
-        if ID_RE.match(self.revisionExpr) is not None:
-            is_sha1 = True
+        if not self.bare:
+            if ID_RE.match(self.revisionExpr) is not None:
+                is_sha1 = True
 
         if current_branch_only:
             if self.revisionExpr.startswith(R_TAGS):
@@ -2515,35 +2531,36 @@ class Project(object):
             spec.append("tag")
             spec.append(tag_name)
 
-        if self.manifest.IsMirror and not current_branch_only:
-            branch = None
-        else:
-            branch = self.revisionExpr
-        if (
-            not self.manifest.IsMirror
-            and is_sha1
-            and depth
-            and git_require((1, 8, 3))
-        ):
-            # Shallow checkout of a specific commit, fetch from that commit and
-            # not the heads only as the commit might be deeper in the history.
-            spec.append(branch)
-            if self.upstream:
-                spec.append(self.upstream)
-        else:
-            if is_sha1:
-                branch = self.upstream
-            if branch is not None and branch.strip():
-                if not branch.startswith("refs/"):
-                    branch = R_HEADS + branch
-                spec.append(str(("+%s:" % branch) + remote.ToLocal(branch)))
+        if not self.bare:
+            if self.manifest.IsMirror and not current_branch_only:
+                branch = None
+            else:
+                 branch = self.revisionExpr
+            if (
+                not self.manifest.IsMirror
+                and is_sha1
+                and depth
+                and git_require((1, 8, 3))
+            ):
+                # Shallow checkout of a specific commit, fetch from that commit and
+                # not the heads only as the commit might be deeper in the history.
+                spec.append(branch)
+                if self.upstream:
+                    spec.append(self.upstream)
+            else:
+                if is_sha1:
+                    branch = self.upstream
+                if branch is not None and branch.strip():
+                    if not branch.startswith("refs/"):
+                        branch = R_HEADS + branch
+                    spec.append(str(("+%s:" % branch) + remote.ToLocal(branch)))
 
-        # If mirroring repo and we cannot deduce the tag or branch to fetch,
-        # fetch whole repo.
-        if self.manifest.IsMirror and not spec:
-            spec.append(
-                str(("+refs/heads/*:") + remote.ToLocal("refs/heads/*"))
-            )
+            # If mirroring repo and we cannot deduce the tag or branch to fetch,
+            # fetch whole repo.
+            if self.manifest.IsMirror and not spec:
+                spec.append(
+                    str(("+refs/heads/*:") + remote.ToLocal("refs/heads/*"))
+                )
 
         # If using depth then we should not get all the tags since they may
         # be outside of the depth.
@@ -3139,14 +3156,15 @@ class Project(object):
                 dst = self.revisionId + "^0"
                 active_git.UpdateRef(ref, dst, message=msg, detach=True)
         else:
-            remote = self.GetRemote()
-            dst = remote.ToLocal(self.revisionExpr)
-            if cur != dst:
-                msg = "manifest set to %s" % self.revisionExpr
-                if detach:
-                    active_git.UpdateRef(ref, dst, message=msg, detach=True)
-                else:
-                    active_git.symbolic_ref("-m", msg, ref, dst)
+            if not self.bare:
+                remote = self.GetRemote()
+                dst = remote.ToLocal(self.revisionExpr)
+                if cur != dst:
+                    msg = "manifest set to %s" % self.revisionExpr
+                    if detach:
+                        active_git.UpdateRef(ref, dst, message=msg, detach=True)
+                    else:
+                        active_git.symbolic_ref("-m", msg, ref, dst)
 
     def _CheckDirReference(self, srcdir, destdir):
         # Git worktrees don't use symlinks to share at all.
@@ -3276,47 +3294,56 @@ class Project(object):
         backed by "foo/bar" on the server, but now it's "new/foo/bar".  We have
         to update the path we point to under .repo/projects/ to match.
         """
-        dotgit = os.path.join(self.worktree, ".git")
-
-        # If using an old layout style (a directory), migrate it.
-        if not platform_utils.islink(dotgit) and platform_utils.isdir(dotgit):
-            self._MigrateOldWorkTreeGitDir(dotgit, project=self.name)
-
-        init_dotgit = not os.path.exists(dotgit)
-        if self.use_git_worktrees:
+        if self.bare:
+            dotgit = self.worktree
+            init_dotgit = not os.path.exists(dotgit)
             if init_dotgit:
-                self._InitGitWorktree()
-                self._CopyAndLinkFiles()
-        else:
-            if not init_dotgit:
-                # See if the project has changed.
-                if platform_utils.realpath(
-                    self.gitdir
-                ) != platform_utils.realpath(dotgit):
-                    platform_utils.remove(dotgit)
-
-            if init_dotgit or not os.path.exists(dotgit):
-                os.makedirs(self.worktree, exist_ok=True)
+                os.makedirs(os.path.dirname(self.worktree), exist_ok=True)
                 platform_utils.symlink(
-                    os.path.relpath(self.gitdir, self.worktree), dotgit
+                    os.path.relpath(self.gitdir, os.path.dirname(self.worktree)), dotgit
                 )
+        else:
+             dotgit = os.path.join(self.worktree, ".git")
 
-            if init_dotgit:
-                _lwrite(
-                    os.path.join(dotgit, HEAD), "%s\n" % self.GetRevisionId()
-                )
+             # If using an old layout style (a directory), migrate it.
+             if not platform_utils.islink(dotgit) and platform_utils.isdir(dotgit):
+                 self._MigrateOldWorkTreeGitDir(dotgit, project=self.name)
 
-                # Finish checking out the worktree.
-                cmd = ["read-tree", "--reset", "-u", "-v", HEAD]
-                if GitCommand(self, cmd).Wait() != 0:
-                    raise GitError(
-                        "Cannot initialize work tree for " + self.name,
-                        project=self.name,
-                    )
+             init_dotgit = not os.path.exists(dotgit)
+             if self.use_git_worktrees:
+                 if init_dotgit:
+                     self._InitGitWorktree()
+                     self._CopyAndLinkFiles()
+             else:
+                 if not init_dotgit:
+                     # See if the project has changed.
+                     if platform_utils.realpath(
+                          self.gitdir
+                     ) != platform_utils.realpath(dotgit):
+                         platform_utils.remove(dotgit)
 
-                if submodules:
-                    self._SyncSubmodules(quiet=True)
-                self._CopyAndLinkFiles()
+                 if init_dotgit or not os.path.exists(dotgit):
+                     os.makedirs(self.worktree, exist_ok=True)
+                     platform_utils.symlink(
+                         os.path.relpath(self.gitdir, self.worktree), dotgit
+                     )
+
+                 if init_dotgit:
+                     _lwrite(
+                         os.path.join(dotgit, HEAD), "%s\n" % self.GetRevisionId()
+                     )
+
+                     # Finish checking out the worktree.
+                     cmd = ["read-tree", "--reset", "-u", "-v", HEAD]
+                     if GitCommand(self, cmd).Wait() != 0:
+                         raise GitError(
+                             "Cannot initialize work tree for " + self.name,
+                             project=self.name,
+                         )
+
+                     if submodules:
+                         self._SyncSubmodules(quiet=True)
+                     self._CopyAndLinkFiles()
 
     @classmethod
     def _MigrateOldWorkTreeGitDir(cls, dotgit, project=None):

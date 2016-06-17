@@ -1818,13 +1818,15 @@ https://gerrit.googlesource.com/git-repo/+/HEAD/docs/manifest-format.md
                 "no remote for project %s within %s" % (name, self.manifestFile)
             )
 
+        bare = node.getAttribute('bare')
+
         revisionExpr = node.getAttribute("revision") or remote.revision
-        if not revisionExpr:
+        if not revisionExpr and not bare:
             revisionExpr = self._default.revisionExpr
-        if not revisionExpr:
-            raise ManifestParseError(
-                "no revision for project %s within %s"
-                % (name, self.manifestFile)
+            if not revisionExpr:
+                raise ManifestParseError(
+                    "no revision for project %s within %s"
+                    % (name, self.manifestFile)
             )
 
         path = node.getAttribute("path")
@@ -1893,6 +1895,7 @@ https://gerrit.googlesource.com/git-repo/+/HEAD/docs/manifest-format.md
             relpath=relpath,
             revisionExpr=revisionExpr,
             revisionId=None,
+            bare=bare,
             rebase=rebase,
             groups=groups,
             sync_c=sync_c,

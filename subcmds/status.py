@@ -104,6 +104,8 @@ the following meanings:
         Returns:
             The status of the project.
         """
+        if project.bare == 'True':
+            return (0, None)
         buf = io.StringIO()
         ret = project.PrintWorkTreeStatus(
             quiet=quiet, output_redir=buf, local=local
@@ -162,6 +164,8 @@ the following meanings:
             for project in self.GetProjects(
                 None, missing_ok=True, all_manifests=not opt.this_manifest_only
             ):
+                if project.bare == 'True':
+                    continue
                 relpath = project.RelPath(local=opt.this_manifest_only)
                 proj_dirs.add(relpath)
                 (head, _tail) = os.path.split(relpath)

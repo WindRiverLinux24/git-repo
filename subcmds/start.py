@@ -119,6 +119,8 @@ revision specified in the manifest.
 
         def _ProcessResults(_pool, pm, results):
             for result in results:
+                if result.project.bare == 'True':
+                    continue
                 if result.error:
                     err_projects.append(result.project)
                     err.append(result.error)

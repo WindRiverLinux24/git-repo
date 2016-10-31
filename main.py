@@ -559,14 +559,10 @@ def _CheckWrapperVersion(ver_str, repo_path):
         print(
             """
 repo: error:
-!!! Your version of repo %s is too old.
-!!! We need at least version %s.
-!!! A new version of repo (%s) is available.
-!!! You must upgrade before you can continue:
-
-    cp %s %s
+!!! The repo command you ran is not compatible.
+!!! You should upgrade your system or run repo using: %s
 """
-            % (ver_str, min_str, exp_str, WrapperPath(), repo_path),
+            % (WrapperPath()),
             file=sys.stderr,
         )
         sys.exit(1)
@@ -588,12 +584,10 @@ repo: error:
         else:
             print(
                 """\
-... New version is available at: %s
-... The launcher is run from: %s
-!!! The launcher is not writable.  Please talk to your sysadmin or distro
-!!! to get an update installed.
+...The repo command in your project is newer.
+... You should upgrade your system or run repo using: %s
 """
-                % (WrapperPath(), repo_path),
+                % (WrapperPath()),
                 file=sys.stderr,
             )
 

@@ -2686,6 +2686,7 @@ class Project(object):
                     depth=None,
                     ssh_proxy=ssh_proxy,
                     clone_filter=clone_filter,
+                    force_sync=force_sync
                 )
 
         return ok

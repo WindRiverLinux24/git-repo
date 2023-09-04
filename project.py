@@ -1984,7 +1984,8 @@ class Project(object):
         old_packed = ''
 
         for r in sorted(all_refs):
-          line = '%s %s\n' % (all_refs[r], r)
+          r0 = r.decode('unicode_escape').encode('unicode_escape')
+          line = '%s %s\n' % (all_refs[r], r0)
           tmp_packed += line
           if r not in tmp:
             old_packed += line

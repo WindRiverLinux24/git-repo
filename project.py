@@ -1984,7 +1984,10 @@ class Project(object):
         old_packed = ''
 
         for r in sorted(all_refs):
-          line = '%s %s\n' % (all_refs[r], r)
+          try:
+            line = '%s %s\n' % (all_refs[r], r)
+          except:
+            continue
           tmp_packed += line
           if r not in tmp:
             old_packed += line

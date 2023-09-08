@@ -108,7 +108,6 @@ class GitRefs(object):
       return
     try:
       for line in fd:
-        line = line.decode('unicode_escape').encode('unicode_escape')
         line = str(line)
         if line[0] == '#':
           continue

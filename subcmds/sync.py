@@ -1239,6 +1239,24 @@ later is required to fix a server side protocol bug.
         file_path = os.path.join(manifest.subdir, file_name)
         old_project_paths = []
 
+        def delete_obsolete_bare_repo(path):
+            """
+            Delete obsolete bare repo, these kind of repos may hide do_fetch errors.
+            """
+            import subprocess
+            import shutil
+            cmd = ['git', 'rev-parse', '--is-bare-repository']
+            try:
+                ret = subprocess.check_output(cmd, stderr=subprocess.STDOUT, cwd=path).decode('utf-8')
+                if ret.strip() == 'true':
+                    print('Deleting obsolete bare git repo %s' % path, file=sys.stderr)
+                    if os.path.islink(path):
+                        os.unlink(path)
+                    else:
+                        shutil.rmtree(path)
+            except Exception as esc:
+                logger.warning('Failed %s: %s' % (path, esc))
+
         if os.path.exists(file_path):
             with open(file_path, "r") as fd:
                 old_project_paths = fd.read().split("\n")
@@ -1247,6 +1265,7 @@ later is required to fix a server side protocol bug.
                 if not path:
                     continue
                 if path not in new_project_paths:
+                    delete_obsolete_bare_repo(os.path.join(manifest.topdir, path))
                     # If the path has already been deleted, we don't need to do
                     # it.
                     gitdir = os.path.join(manifest.topdir, path, ".git")

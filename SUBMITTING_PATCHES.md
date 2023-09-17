@@ -1,19 +1,19 @@
+# Submitting Changes
+
+Here's a short overview of the process.
+
+*   Make small logical changes.
+*   [Provide a meaningful commit message][commit-message-style].
+*   Make sure all code is under the Apache License, 2.0.
+*   Publish your changes for review.
+    *   `git push origin HEAD:refs/for/main`
+*   Make corrections if requested.
+*   [Verify your changes on Gerrit.](#verify)
+*   [Send to the commit queue for testing & merging.](#cq)
+
 [TOC]
 
-# Short Version
-
- - Make small logical changes.
- - Provide a meaningful commit message.
- - Check for coding errors and style nits with pyflakes and flake8
- - Make sure all code is under the Apache License, 2.0.
- - Publish your changes for review.
- - Make corrections if requested.
- - Verify your changes on gerrit so they can be submitted.
-
-   `git push https://gerrit-review.googlesource.com/git-repo HEAD:refs/for/master`
-
-
-# Long Version
+## Long Version
 
 I wanted a file describing how to submit patches for repo,
 so I started with the one found in the core Git distribution
@@ -26,10 +26,11 @@ yourself with the following relevant bits.
 
 ## Make separate commits for logically separate changes.
 
-Unless your patch is really trivial, you should not be sending
-out a patch that was generated between your working tree and your
-commit head.  Instead, always make a commit with complete commit
-message and generate a series of patches from your repository.
+Unless your patch is really trivial, you should not be sending out a patch that
+was generated between your working tree and your commit head.
+Instead, always make a commit with a complete
+[commit message][commit-message-style] and generate a series of patches from
+your repository.
 It is a good discipline.
 
 Describe the technical detail of the change(s).
@@ -38,41 +39,74 @@ If your description starts to get too long, that's a sign that you
 probably need to split up your commit to finer grained pieces.
 
 
-## Check for coding errors and style nits with pyflakes and flake8
+## Linting and formatting code
 
-### Coding errors
+Lint any changes by running:
+```sh
+$ tox -e lint -- file.py
+```
 
-Run `pyflakes` on changed modules:
+And format with:
+```sh
+$ tox -e format -- file.py
+```
 
-    pyflakes file.py
+Or format everything:
+```sh
+$ tox -e format
+```
 
-Ideally there should be no new errors or warnings introduced.
+Repo uses [black](https://black.readthedocs.io/) with line length of 80 as its
+formatter and flake8 as its linter. Repo also follows
+[Google's Python Style Guide].
 
-### Style violations
+There should be no new errors or warnings introduced.
 
-Run `flake8` on changes modules:
+Warnings that cannot be avoided without going against the Google Style Guide
+may be suppressed inline individally using a `# noqa` comment as described
+in the [flake8 documentation].
 
-    flake8 file.py
+If there are many occurrences of the same warning, these may be suppressed for
+the entire project in the included `.flake8` file.
 
-Note that repo generally follows [Google's python style guide] rather than
-[PEP 8], so it's possible that the output of `flake8` will be quite noisy.
-It's not mandatory to avoid all warnings, but at least the maximum line
-length should be followed.
-
-If there are many occurrences of the same warning that cannot be
-avoided without going against the Google style guide, these may be
-suppressed in the included `.flake8` file.
-
-[Google's python style guide]: https://google.github.io/styleguide/pyguide.html
+[Google's Python Style Guide]: https://google.github.io/styleguide/pyguide.html
 [PEP 8]: https://www.python.org/dev/peps/pep-0008/
-
+[flake8 documentation]: https://flake8.pycqa.org/en/3.1.1/user/ignoring-errors.html#in-line-ignoring-errors
 
 ## Running tests
 
-There is a [`./run_tests`](./run_tests) helper script for quickly invoking all
-of our unittests.  The coverage isn't great currently, but it should still be
-run for all commits.
+We use [pytest](https://pytest.org/) and [tox](https://tox.readthedocs.io/) for
+running tests.  You should make sure to install those first.
 
+To run the full suite against all supported Python versions, simply execute:
+```sh
+$ tox -p auto
+```
+
+We have [`./run_tests`](./run_tests) which is a simple wrapper around `pytest`:
+```sh
+# Run the full suite against the default Python version.
+$ ./run_tests
+# List each test as it runs.
+$ ./run_tests -v
+
+# Run a specific unittest module (and all tests in it).
+$ ./run_tests tests/test_git_command.py
+
+# Run a specific testsuite in a specific unittest module.
+$ ./run_tests tests/test_editor.py::EditString
+
+# Run a single test.
+$ ./run_tests tests/test_editor.py::EditString::test_cat_editor
+
+# List all available tests.
+$ ./run_tests --collect-only
+
+# Run a single test using substring match.
+$ ./run_tests -k test_cat_editor
+```
+
+The coverage isn't great currently, but it should still be run for all commits.
 Adding more unittests for changes you make would be greatly appreciated :).
 Check out the [tests/](./tests/) subdirectory for more details.
 
@@ -126,7 +160,7 @@ Push your patches over HTTPS to the review server, possibly through
 a remembered remote to make this easier in the future:
 
     git config remote.review.url https://gerrit-review.googlesource.com/git-repo
-    git config remote.review.push HEAD:refs/for/master
+    git config remote.review.push HEAD:refs/for/main
 
     git push review
 
@@ -141,9 +175,16 @@ commit. If you make the requested changes you will need to amend your commit
 and push it to the review server again.
 
 
-## Verify your changes on gerrit
+## Verify your changes on Gerrit {#verify}
 
 After you receive a Code-Review+2 from the maintainer, select the Verified
-button on the gerrit page for the change. This verifies that you have tested
+button on the Gerrit page for the change. This verifies that you have tested
 your changes and notifies the maintainer that they are ready to be submitted.
-The maintainer will then submit your changes to the repository.
+
+## Merge your changes via the commit queue {#cq}
+
+Once a change is ready to be merged, select the Commit-Queue+2 setting on the
+Gerrit page for it. This tells the CI system to test the change, and if it
+passes all the checks, automatically merges it.
+
+[commit-message-style]: https://chris.beams.io/posts/git-commit/

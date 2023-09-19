@@ -1986,11 +1986,11 @@ class Project(object):
         for r in sorted(all_refs):
           try:
             line = '%s %s\n' % (all_refs[r], r)
+            tmp_packed += line
+            if r not in tmp:
+              old_packed += line
           except:
             continue
-          tmp_packed += line
-          if r not in tmp:
-            old_packed += line
 
         _lwrite(packed_refs, tmp_packed)
       else:

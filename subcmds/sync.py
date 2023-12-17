@@ -1255,7 +1255,7 @@ later is required to fix a server side protocol bug.
                     else:
                         shutil.rmtree(path)
             except Exception as esc:
-                logger.warning('Failed %s: %s' % (path, esc))
+                print('Failed %s: %s' % (path, esc), file=sys.stderr)
 
         if os.path.exists(file_path):
             with open(file_path, "r") as fd:

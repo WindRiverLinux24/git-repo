@@ -452,6 +452,10 @@ class CloneFailure(Exception):
 
 def check_repo_verify(repo_verify, quiet=False):
   """Check the --repo-verify state."""
+
+  if not MAINTAINER_KEYS:
+    return False
+
   if not repo_verify:
     print('repo: warning: verification of repo code has been disabled;\n'
           'repo will not be able to verify the integrity of itself.\n',

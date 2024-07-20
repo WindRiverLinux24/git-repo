@@ -133,6 +133,23 @@ def not_rev(r):
 def sq(r):
     return "'" + r.replace("'", "'''") + "'"
 
+def _disable_compression_for_dl(gitdir, config):
+    """
+    The files in dl layers are binaries, compress them doesn't make any sense,
+    and may cost a lot of time for large files, which caused errors like:
+    error: RPC failed; curl 18 transfer closed with outstanding read data remaining
+    fatal: the remote end hung up unexpectedly
+    fatal: early EOF
+    fatal: unpack-objects failed
+    """
+    gitdir_bn = os.path.basename(gitdir)
+    if gitdir_bn.endswith('.git'):
+        gitdir_bn = gitdir_bn[:-4]
+    if gitdir_bn.endswith('-dl') or '-dl-' in gitdir_bn:
+        config.SetString(
+            "core.compression", "0"
+        )
+
 
 _project_hook_list = None
 
@@ -3022,6 +3039,9 @@ class Project(object):
                 self.config.SetBoolean(
                     "core.bare", True if self.manifest.IsMirror else None
                 )
+
+                _disable_compression_for_dl(self.gitdir, self.config)
+
         except Exception:
             if init_obj_dir and os.path.exists(self.objdir):
                 platform_utils.rmtree(self.objdir)
@@ -4240,6 +4260,8 @@ class ManifestProject(MetaProject):
         # If --standalone-manifest is set, we always tear everything down and
         # start anew.
         if self.Exists:
+            _disable_compression_for_dl(self.gitdir, self.config)
+
             was_standalone_manifest = self.config.GetString(
                 "manifest.standalone"
             )

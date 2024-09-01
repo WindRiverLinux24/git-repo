@@ -452,6 +452,10 @@ class CloneFailure(Exception):
 
 def check_repo_verify(repo_verify, quiet=False):
   """Check the --repo-verify state."""
+
+  if not MAINTAINER_KEYS:
+    return False
+
   if not repo_verify:
     print('repo: warning: verification of repo code has been disabled;\n'
           'repo will not be able to verify the integrity of itself.\n',
@@ -605,7 +609,7 @@ def SetGitTrace2ParentSid(env=None):
 
   KEY = 'GIT_TRACE2_PARENT_SID'
 
-  now = datetime.datetime.utcnow()
+  now = datetime.datetime.now(datetime.timezone.utc)
   value = 'repo-%s-P%08x' % (now.strftime('%Y%m%dT%H%M%SZ'), os.getpid())
 
   # If it's already set, then append ourselves.

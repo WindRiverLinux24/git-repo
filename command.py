@@ -432,7 +432,11 @@ class Command(object):
         def _getpath(x):
             return x.relpath
 
-        result.sort(key=_getpath)
+        # This sort only makes sense for the initial sync, it will sort by fetch time
+        # from the second sync (The longest fetch time will be fetched firstly), but
+        # there is no fetch time in the initial sync, and our default.xml is already
+        # sorted, so just disable the sort to sync in default.xml's order.
+        #result.sort(key=_getpath)
         return result
 
     def FindProjects(self, args, inverse=False, all_manifests=False):

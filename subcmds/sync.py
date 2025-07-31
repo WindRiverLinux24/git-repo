@@ -1245,6 +1245,11 @@ later is required to fix a server side protocol bug.
             """
             import subprocess
             import shutil
+
+            # If the path has already been deleted, do nothing
+            if not os.path.exists(path):
+                return
+
             cmd = ['git', 'rev-parse', '--is-bare-repository']
             try:
                 ret = subprocess.check_output(cmd, stderr=subprocess.STDOUT, cwd=path).decode('utf-8')
